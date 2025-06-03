@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable Drone Path</title>
+    <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
+    
+</head>
+<body>
+    <div id="map"></div>
+    <!--zoom in and out-->
+    <div class="zoom-controls">
+        <button onclick="zoomIn()">+</button>
+        <button onclick="zoomOut()">-</button>
+    </div>
+    <!--my location-->
+    <div class="location-controls">
+        <button onclick="getMyLocation()">Get My Location</button>
+    </div>
+    <!-- Bearing Controls -->
+    <div class="bearing-control">
+        <button onclick="rotateLeft()">&#8592;</button>
+        <button onclick="rotateRight()">&#8594;</button>
+    </div>
+
+    <!-- Pitch Control (Circular control) -->
+    <div class="pitch-control">
+        <div class="pitch-inner-circle" id="pitchControlInnerCircle"></div>
+    </div>
+    <!--waypoint-list-->
+    <div class="waypoint-sidebar" id="waypoint-sidebar">
+        <input type="text" class="search-bar" id="search-bar" placeholder="Search Waypoints..." onkeyup="searchWaypoints()" />
+        <h3>Waypoints</h3>
+        <div id="waypoint-list"></div>
+    </div>
+    
+
+    <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+    
+</body>
+</html>

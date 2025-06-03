@@ -1,0 +1,167 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+}
+
+button {
+    font-family: 'Arial', sans-serif;
+    font-size: 16px;
+    padding: 12px 18px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#map {
+    height: 100%;
+    width: 100%;
+}
+
+.waypoint-sidebar {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1000;
+    width: 250px;
+    overflow-y: auto;
+    max-height: 90%;
+}
+
+.waypoint-item {
+    margin-bottom: 10px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.waypoint-item.highlight {
+    border-color: #007bff;
+    background-color: #e7f3ff;
+}
+
+.waypoint-item label {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 14px;
+}
+
+.search-bar {
+    margin-bottom: 10px;
+}
+
+
+.zoom-controls {
+position: absolute;
+top: 20px;
+left: 20px;
+background: rgba(255, 255, 255, 0.8);
+padding: 10px;
+border-radius: 5px;
+z-index: 1000;
+}
+
+.zoom-controls button {
+    background: linear-gradient(135deg, #4CAF50, #2E7D32);
+    color: white;
+}
+
+.zoom-controls button:hover {
+    background: linear-gradient(135deg, #66BB6A, #388E3C);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.location-controls {
+position: absolute;
+top: 80px;
+left: 20px;
+background: rgba(255, 255, 255, 0.8);
+padding: 10px;
+border-radius: 5px;
+z-index: 1000;
+}
+
+.location-controls button {
+    background: linear-gradient(135deg, #03A9F4, #0288D1);
+    color: white;
+}
+
+.location-controls button:hover {
+    background: linear-gradient(135deg, #29B6F6, #039BE5);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.control-buttons {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 10px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.control-buttons button {
+    background: linear-gradient(135deg, #FF5722, #E64A19);
+    color: white;
+}
+
+.control-buttons button:hover {
+    background: linear-gradient(135deg, #FF7043, #D84315);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Arrow key control arrows */
+.arrow-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.arrow-controls button {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    color: white;
+    font-size: 18px;
+    width: 50px;
+    height: 50px;
+}
+
+
+.arrow-controls button:hover {
+    background: linear-gradient(135deg, #BA68C8, #8E24AA);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+#download-csv {
+    background: linear-gradient(135deg, #FFC107, #FF9800);
+    color: white;
+    font-size: 16px;
+}
+
+#download-csv:hover {
+    background: linear-gradient(135deg, #FFD54F, #FB8C00);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+button:focus {
+    outline: none;
+    box-shadow: 0 0 8px rgba(0, 0, 255, 0.5);
+}
+
+button:active {
+    transform: translateY(1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}

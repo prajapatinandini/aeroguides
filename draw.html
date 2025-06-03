@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Map with Waypoints and Live Location</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+        }
+
+        .map-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            border: 2px solid #333;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        .toolbar button {
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 5px 0;
+            transition: transform 0.2s, background-color 0.3s;
+        }
+
+        .toolbar button:hover {
+            background-color: #138496;
+            transform: scale(1.05);
+        }
+
+        .download-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background-color: #28a745;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            font-size: 16px;
+            transition: transform 0.2s, background-color 0.3s;
+        }
+
+        .download-button:hover {
+            background-color: #218838;
+            transform: scale(1.1);
+        }
+
+        .custom-marker div {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .custom-marker.green div {
+            background-color: #28a745;
+        }
+
+        .custom-marker.red div {
+            background-color: #dc3545;
+        }
+
+        .custom-marker.blue div {
+            background-color: #007bff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="map-container">
+    <div id="map"></div>
+    <div class="toolbar">
+        <button id="start-waypoint">Start Waypoint</button>
+        <button id="end-waypoint">End Waypoint</button>
+        <button id="normal-waypoint">Normal Waypoint</button>
+        <button id="locate-me">Locate Me</button>
+    </div>
+    <button class="download-button" id="download-csv">Download Waypoints (CSV)</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map', {
+        zoomSnap: 0.25,
+        zoomDelta: 0.5,
+        zoomControl: true
+    }).setView([0, 0], 16);
+
+    // Add OpenStreetMap base layer
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; <a href="https://www.esri.com/en-us/home">Esri</a>',
+    });
+
+    L.control.layers({
+        "OpenStreetMap": osmLayer,
+        "Satellite": satelliteLayer
+    }).addTo(map);
+
+    const colors = { start: 'green', end: 'red', normal: 'blue' };
+    let selectedWaypointType = 'normal';
+
+    document.getElementById('start-waypoint').addEventListener('click', () => {
+        selectedWaypointType = 'start';
+        alert('Start Waypoint selected!');
+    });
+
+    document.getElementById('end-waypoint').addEventListener('click', () => {
+        selectedWaypointType = 'end';
+        alert('End Waypoint selected!');
+    });
+
+    document.getElementById('normal-waypoint').addEventListener('click', () => {
+        selectedWaypointType = 'normal';
+        alert('Normal Waypoint selected!');
+    });
+
+    let drawnPoints = [];
+    let markers = [];
+    let polyline = null;
+
+    map.on('click', function(e) {
+        const { lat, lng } = e.latlng;
+        const waypoint = { lat, lng, type: selectedWaypointType };
+        drawnPoints.push(waypoint);
+
+        const marker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: `custom-marker ${selectedWaypointType}`,
+                html: '<div></div>'
+            })
+        }).addTo(map);
+        markers.push(marker);
+
+        marker.bindPopup(`
+            <b>${selectedWaypointType.charAt(0).toUpperCase() + selectedWaypointType.slice(1)} Waypoint</b><br>
+            Lat: ${lat.toFixed(6)}<br>
+            Lng: ${lng.toFixed(6)}
+        `);
+
+        updatePolyline();
+    });
+
+    function updatePolyline() {
+        if (polyline) {
+            map.removeLayer(polyline);
+        }
+        const latLngs = drawnPoints.map(point => [point.lat, point.lng]);
+        polyline = L.polyline(latLngs, { color: 'blue', weight: 4 }).addTo(map);
+    }
+
+    document.getElementById('locate-me').addEventListener('click', () => {
+        map.locate({ setView: true, maxZoom: 16 });
+    });
+
+    map.on('locationfound', function(e) {
+        const { lat, lng } = e.latlng;
+
+        L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'custom-marker green',
+                html: '<div></div>'
+            })
+        }).addTo(map).bindPopup('<b>Your Current Location</b>').openPopup();
+    });
+
+    map.on('locationerror', function() {
+        alert('Unable to access your location. Please enable location services and try again.');
+    });
+
+    document.getElementById('download-csv').addEventListener('click', function() {
+        if (drawnPoints.length === 0) {
+            alert('No waypoints to export!');
+            return;
+        }
+
+        const header = ['Latitude', 'Longitude', 'Type'];
+        const rows = drawnPoints.map(point => [point.lat, point.lng, point.type]);
+        let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
+
+        rows.forEach(row => {
+            csvContent += row.join(",") + "\n";
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', 'waypoints.csv');
+        document.body.appendChild(link);
+        link.click();
+    });
+</script>
+
+</body>
+</html>

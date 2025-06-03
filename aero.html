@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable Drone Path</title>
+    <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="C:\Users\nandi\OneDrive\Desktop\mapjam\aero.css" rel="stylesheet">
+</head>
+<body>
+    <div id="map"></div>
+
+    <!--zoom in and out-->
+    <div class="zoom-controls">
+        <button onclick="zoomIn()">+</button>
+        <button onclick="zoomOut()">-</button>
+    </div>
+
+    <!--my location-->
+    <div class="location-controls">
+        <button onclick="getMyLocation()">Get My Location</button>
+
+        <!--general altitude input-->
+        <div class="altitude-controls">
+            <label for="altitude-input">General Altitude (meters):</label>
+            <input type="number" id="altitude-input" placeholder="Enter altitude" onchange="setGeneralAltitude(this.value)" />
+        </div>
+    </div>
+
+    <div class="control-buttons">
+        <div class="arrow-controls">
+            <button id="rotate-left">&#8592;</button>
+            <button id="rotate-right">&#8594;</button>
+        </div>
+        <div class="arrow-controls">
+            <button id="increase-pitch">&#8593;</button>
+            <button id="decrease-pitch">&#8595;</button>
+        </div>
+
+        <div class="control-container">
+            <button id="download-csv">Download CSV</button>
+        </div>
+    </div>
+
+    <!--waypoint-list-->
+    <div class="waypoint-sidebar" id="waypoint-sidebar">
+        <input type="text" class="search-bar" id="search-bar" placeholder="Search Waypoints..." onkeyup="searchWaypoints()" />
+        <h3>Waypoints</h3>
+        <div id="waypoint-list"></div>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+    <script src="C:\Users\nandi\OneDrive\Desktop\mapjam\aero.js"></script>
+</body>
+</html>

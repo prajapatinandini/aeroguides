@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freehand Drawing on Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            height: 80%;
+            width: 100%;
+            margin-top: 20px;  /* Adds spacing between buttons and the map */
+        }
+
+        .button-container {
+            position: fixed; /* Fix buttons at the top of the screen */
+            top: 10px; /* 10px from the top */
+            left: 50%; /* Center horizontally */
+            transform: translateX(-50%); /* Center the container perfectly */
+            display: flex;
+            flex-direction: row; /* Arrange buttons in a row */
+            gap: 10px; /* Space between buttons */
+            z-index: 1000;
+            width: auto; /* Allow container to adjust width based on buttons */
+            max-width: 80%; /* Limit the container width */
+            justify-content: center; /* Center the buttons */
+        }
+
+        .button-container button {
+            padding: 5px 10px; /* Smaller button size */
+            font-size: 12px; /* Smaller text size */
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .button-container button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="button-container">
+        <button class="get-location-button" onclick="getLocation()">Get My Location</button>
+        <button class="enable-location-button" onclick="enableLocation()">Enable Location</button>
+        <button class="download-csv-button" onclick="downloadCSV()">Download CSV</button>
+        <button class="start-drone-button" onclick="setStartDrone()">Set Start Point</button>
+        <button class="land-drone-button" onclick="setLandDrone()">Set Land Point</button>
+        <button class="lock-zoom-button" onclick="lockZoom()">Lock Zoom</button>
+        <button class="release-zoom-button" onclick="releaseZoom()">Release Zoom</button>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize the map
+        const map = L.map('map', {
+    center: [51.505, -0.09],
+    zoom: 18,  // Set the initial zoom level
+    zoomControl: true,
+    maxZoom: 18,  // Maximum zoom level
+    minZoom: 10   // Minimum zoom level
+});
+
+
+        // Add satellite tile layer (Esri World Imagery)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let isDrawing = false;
+        let drawnLine = [];
+        const drawnItems = new L.FeatureGroup().addTo(map);
+        const waypoints = [];  // Store the waypoints (lat, lon)
+        let startPoint = null;
+        let landPoint = null;
+        let fixedZoomLevel = map.getZoom(); // Store the initial zoom level
+        let isZoomLocked = false;  // To track the zoom lock state
+
+        // Function to start drawing freehand
+        function startDrawing(e) {
+            isDrawing = true;
+            drawnLine = [e.latlng]; // Start the line at the current mouse/touch position
+            waypoints.push([e.latlng.lat, e.latlng.lng]); // Save the first point as a waypoint
+
+            // Disable map dragging and zooming while drawing
+            map.dragging.disable();
+            map.scrollWheelZoom.disable();
+        }
+
+        // Function to update the drawing as the mouse moves
+        function updateDrawing(e) {
+            if (!isDrawing) return;
+            const latlng = e.latlng;
+
+            // Add the new point to the line
+            drawnLine.push(latlng);
+            waypoints.push([latlng.lat, latlng.lng]); // Save the waypoint
+
+            // Draw the line on the map
+            const polyline = L.polyline(drawnLine, { color: 'red', weight: 3 }).addTo(drawnItems);
+        }
+
+        // Function to finish drawing
+        function finishDrawing() {
+            if (isDrawing) {
+                isDrawing = false;
+                const polyline = L.polyline(drawnLine, { color: 'red', weight: 3 }).addTo(drawnItems);
+                drawnItems.addLayer(polyline); // Store the drawn line in the drawnItems layer
+                drawnLine = []; // Reset for next drawing
+
+                // Re-enable map dragging and zooming after drawing is complete
+                map.dragging.enable();
+                map.scrollWheelZoom.enable();
+            }
+        }
+
+        // Prevent zoom changes while drawing
+        map.on('zoomstart', function() {
+            if (isDrawing && isZoomLocked) {
+                map.setZoom(fixedZoomLevel); // Keep the zoom level fixed if zoom is locked
+            }
+        });
+
+        // Listen to mouse or touch events to draw
+        map.on('mousedown', startDrawing); // Start on mouse down
+        map.on('mousemove', updateDrawing); // Update on mouse move
+        map.on('mouseup', finishDrawing); // Finish on mouse up
+
+        // Optional: Use touch events for mobile devices
+        map.on('touchstart', startDrawing); // Start drawing on touch start
+        map.on('touchmove', updateDrawing); // Update drawing on touch move
+        map.on('touchend', finishDrawing); // Finish on touch end
+
+        // Function to get the current location and center the map
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    // Set the map view to the user's location
+                    map.setView([lat, lon], 13); // Center the map on user's location
+
+                    // Add a marker at the user's location
+                    L.marker([lat, lon]).addTo(map).bindPopup("You are here!").openPopup();
+                }, function(error) {
+                    alert("Unable to retrieve your location: " + error.message);
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // Function to enable location feature (center the map and show marker)
+        function enableLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    // Update the map view to follow the user's location
+                    map.setView([lat, lon], 13); // Center the map on user's location
+
+                    // Add or update the marker at the user's location
+                    let marker = L.marker([lat, lon]).addTo(map).bindPopup("You are here!").openPopup();
+                }, function(error) {
+                    alert("Unable to retrieve your location: " + error.message);
+                }, {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 27000
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // Function to set the start point for the drone
+        function setStartDrone() {
+            map.once('click', function(e) {
+                startPoint = e.latlng;
+                L.marker([startPoint.lat, startPoint.lng]).addTo(map).bindPopup("Start Point").openPopup();
+                waypoints.push([startPoint.lat, startPoint.lng]);
+            });
+        }
+
+        // Function to set the land point for the drone
+        function setLandDrone() {
+            map.once('click', function(e) {
+                landPoint = e.latlng;
+                L.marker([landPoint.lat, landPoint.lng]).addTo(map).bindPopup("Land Point").openPopup();
+                waypoints.push([landPoint.lat, landPoint.lng]);
+            });
+        }
+
+        function downloadCSV() {
+    if (waypoints.length === 0) {
+        alert("No waypoints to download.");
+        return;
+    }
+
+    // Create a new array to organize waypoints: Start, Waypoints, Land
+    const organizedWaypoints = [];
+
+    // Add the start point if it exists
+    if (startPoint) {
+        organizedWaypoints.push([startPoint.lat, startPoint.lng, "Start Point"]);
+    }
+
+    // Add all other waypoints (excluding start and land points)
+    waypoints.forEach(function(waypoint) {
+        if (
+            (!startPoint || waypoint[0] !== startPoint.lat || waypoint[1] !== startPoint.lng) &&
+            (!landPoint || waypoint[0] !== landPoint.lat || waypoint[1] !== landPoint.lng)
+        ) {
+            organizedWaypoints.push([waypoint[0], waypoint[1], "Waypoint"]);
+        }
+    });
+
+    // Add the land point if it exists
+    if (landPoint) {
+        organizedWaypoints.push([landPoint.lat, landPoint.lng, "Land Point"]);
+    }
+
+    // Create CSV content with organized waypoints
+    let csvContent = "Latitude,Longitude,Point Type\n";
+    organizedWaypoints.forEach(function(waypoint, index) {
+        csvContent += `${waypoint[0]},${waypoint[1]},${waypoint[2]}\n`;
+    });
+
+    // Create a Blob with CSV content and trigger download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'waypoints.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+
+
+       // Function to lock the zoom level
+function lockZoom() {
+    isZoomLocked = true;
+    fixedZoomLevel = map.getZoom(); // Store current zoom level
+    
+    // Lock the zoom level by setting minZoom and maxZoom to the current level
+    map.options.minZoom = fixedZoomLevel;
+    map.options.maxZoom = fixedZoomLevel;
+    
+    alert("Zoom locked! You cannot zoom in or out.");
+}
+
+// Function to release the zoom lock
+function releaseZoom() {
+    isZoomLocked = false;
+    
+    // Restore original minZoom and maxZoom values
+    map.options.minZoom = 10; // Set to the desired minimum zoom level
+    map.options.maxZoom = 19; // Set to the desired maximum zoom level
+    
+    alert("Zoom released! You can zoom in and out freely.");
+}
+
+
+    </script>
+</body>
+</html>

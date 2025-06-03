@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Map with Full Functionality</title>
+    <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+
+        .controls button, .controls input {
+            display: block;
+            margin: 5px 0;
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .waypoint-sidebar {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            width: 250px;
+            overflow-y: auto;
+            max-height: 90%;
+        }
+
+        .waypoint-item {
+            margin-bottom: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .waypoint-item.highlight {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+
+        .waypoint-item label {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="controls">
+        <label for="general-altitude">General Altitude (m):</label>
+        <input type="number" id="general-altitude" value="10" step="1" />
+        <button onclick="adjustPitch(10)">Pitch Up</button>
+        <button onclick="adjustPitch(-10)">Pitch Down</button>
+        <button onclick="adjustBearing(10)">Rotate Right</button>
+        <button onclick="adjustBearing(-10)">Rotate Left</button>
+        <button onclick="adjustZoom(1)">Zoom In</button>
+        <button onclick="adjustZoom(-1)">Zoom Out</button>
+        <button onclick="resetView()">Reset View</button>
+        <hr />
+        <button onclick="getLocation()">Get My Location</button>
+        <button onclick="enableLocation()">Enable Location</button>
+        <button onclick="downloadCSV()">Download CSV</button>
+        <button onclick="setStartDrone()">Set Start Point</button>
+        <button onclick="setLandDrone()">Set Land Point</button>
+    </div>
+    <div class="waypoint-sidebar" id="waypoint-sidebar">
+        <h3>Waypoints</h3>
+        <div id="waypoint-list"></div>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+    <script>
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    satellite: {
+                        type: 'raster',
+                        tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+                        tileSize: 256,
+                        maxzoom: 19
+                    },
+                    drawnLine: {
+                        type: 'geojson',
+                        data: { type: 'FeatureCollection', features: [] }
+                    }
+                },
+                layers: [
+                    {
+                        id: 'satellite-layer',
+                        type: 'raster',
+                        source: 'satellite',
+                        layout: { visibility: 'visible' }
+                    },
+                    {
+                        id: 'drawn-line',
+                        type: 'line',
+                        source: 'drawnLine',
+                        paint: {
+                            'line-color': '#ff0000',
+                            'line-width': 3
+                        }
+                    }
+                ]
+            },
+            center: [13.4050, 52.5200],
+            zoom: 12,
+            pitch: 45,
+            bearing: 0
+        });
+
+        let generalAltitude = 10;
+        document.getElementById('general-altitude').addEventListener('input', (e) => {
+            generalAltitude = parseInt(e.target.value) || 10;
+        });
+
+        function getLocation() {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    map.flyTo({ center: [longitude, latitude], zoom: 15 });
+                    new maplibregl.Marker()
+                        .setLngLat([longitude, latitude])
+                        .setPopup(new maplibregl.Popup().setText("You are here!"))
+                        .addTo(map);
+                },
+                (error) => {
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            alert("Location access denied by user.");
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            alert("Location information is unavailable.");
+                            break;
+                        case error.TIMEOUT:
+                            alert("The request to get user location timed out.");
+                            break;
+                        default:
+                            alert("An unknown error occurred.");
+                            break;
+                    }
+                }
+            );
+        }
+
+        let isDrawing = false;
+        let drawnLine = [];
+        let waypoints = [];
+        const markers = [];
+
+        map.on('mousedown', e => {
+            isDrawing = true;
+            const altitude = generalAltitude;
+            const waypointIndex = waypoints.length + 1;
+            const point = { lat: e.lngLat.lat, lng: e.lngLat.lng, altitude };
+            drawnLine = [point];
+            waypoints.push(point);
+
+            const marker = new maplibregl.Marker()
+                .setLngLat([point.lng, point.lat])
+                .setPopup(new maplibregl.Popup().setText(`Waypoint ${waypointIndex} - Altitude: ${altitude} m`))
+                .addTo(map);
+
+            // Add waypoint number directly to the marker element
+            const label = document.createElement('div');
+            label.style.color = '#fff';
+            label.style.background = '#007bff';
+            label.style.padding = '2px 5px';
+            label.style.borderRadius = '3px';
+            label.style.fontSize = '10px';
+            label.style.position = 'absolute';
+            label.style.transform = 'translate(-50%, -20px)';
+            label.textContent = waypointIndex;
+            marker.getElement().appendChild(label);
+
+            markers.push(marker);
+            updateWaypointList();
+            map.dragPan.disable();
+        });
+
+        map.on('mousemove', e => {
+            if (isDrawing) {
+                const altitude = generalAltitude;
+                const point = { lat: e.lngLat.lat, lng: e.lngLat.lng, altitude };
+                drawnLine.push(point);
+                waypoints.push(point);
+                map.getSource('drawnLine').setData({
+                    type: 'FeatureCollection',
+                    features: [
+                        {
+                            type: 'Feature',
+                            geometry: { type: 'LineString', coordinates: drawnLine.map(pt => [pt.lng, pt.lat]) }
+                        }
+                    ]
+                });
+                updateWaypointList();
+            }
+        });
+
+        map.on('mouseup', () => {
+            isDrawing = false;
+            map.dragPan.enable();
+        });
+
+        function updateWaypointList() {
+            const listContainer = document.getElementById('waypoint-list');
+            listContainer.innerHTML = '';
+            waypoints.forEach((wp, index) => {
+                const item = document.createElement('div');
+                item.className = 'waypoint-item';
+                item.innerHTML = `
+                    <label><strong>Waypoint ${index + 1}</strong></label>
+                    <label>Latitude: ${wp.lat.toFixed(5)}</label>
+                    <label>Longitude: ${wp.lng.toFixed(5)}</label>
+                    <label>Altitude (m):</label>
+                    <input type="number" value="${wp.altitude}" step="1" 
+                        onchange="updateWaypointAltitude(${index}, this.value)"
+                        onfocus="highlightWaypoint(${index})"
+                        onblur="unhighlightWaypoint(${index})" />
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        function updateWaypointAltitude(index, newAltitude) {
+            waypoints[index].altitude = parseInt(newAltitude) || generalAltitude;
+            if (markers[index]) {
+                markers[index].setPopup(new maplibregl.Popup().setText(`Waypoint ${index + 1} - Altitude: ${waypoints[index].altitude} m`));
+            }
+        }
+
+        function highlightWaypoint(index) {
+            document.querySelectorAll('.waypoint-item')[index].classList.add('highlight');
+            if (markers[index]) {
+                markers[index].getElement().style.border = '2px solid #007bff';
+            }
+            map.flyTo({ center: [waypoints[index].lng, waypoints[index].lat], zoom: 15 });
+        }
+
+        function unhighlightWaypoint(index) {
+            document.querySelectorAll('.waypoint-item')[index].classList.remove('highlight');
+            if (markers[index]) {
+                markers[index].getElement().style.border = '';
+            }
+        }
+
+        function downloadCSV() {
+            if (!waypoints.length) {
+                alert("No waypoints to download.");
+                return;
+            }
+
+            const csvContent = "Latitude,Longitude,Altitude (m)\n" + waypoints.map(wp => `${wp.lat},${wp.lng},${wp.altitude}`).join("\n");
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = "waypoints.csv";
+            link.click();
+        }
+
+    </script>
+</body>
+</html>

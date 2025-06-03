@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Auto-Mode Flight from CSV</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 100vh; }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 999;
+        }
+        button {
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        input[type="file"] {
+            margin-top: 10px;
+        }
+        #gpsTracker {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="controls">
+        <input type="file" id="fileInput" accept=".csv" onchange="handleCSVUpload(event)" />
+        <button onclick="startMission()">Start Mission</button>
+        <button onclick="pauseMission()">Pause Mission</button>
+        <button onclick="clearMission()">Clear Mission</button>
+    </div>
+
+    <div id="gpsTracker">
+        <strong>Current GPS Location:</strong>
+        <p id="gpsCoordinates">Latitude: 28.6139, Longitude: 77.2090</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script>
+        // Initialize the map and set the default location to Delhi, India
+        const map = L.map('map').setView([28.6139, 77.2090], 13); 
+
+        // Using Google Maps tile layer for proper location rendering
+        L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            attribution: '&copy; Google',
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+        }).addTo(map);
+
+        const droneMarker = L.marker([28.6139, 77.2090]).addTo(map);
+        let waypoints = [];
+        let missionIndex = 0;
+        let missionActive = false;
+        let missionInterval;
+        let pathPolyline;
+
+        // Function to start the mission
+        function startMission() {
+            if (!missionActive && waypoints.length > 0) {
+                missionActive = true;
+                moveDroneToNextWaypoint();
+            }
+        }
+
+        // Function to pause the mission
+        function pauseMission() {
+            clearInterval(missionInterval);
+            missionActive = false;
+        }
+
+        // Function to clear the mission
+        function clearMission() {
+            missionIndex = 0;
+            if (waypoints.length > 0) {
+                droneMarker.setLatLng([waypoints[0].lat, waypoints[0].lng]); // Correct lat/lng order
+            }
+            clearInterval(missionInterval);
+            missionActive = false;
+            if (pathPolyline) {
+                pathPolyline.remove();
+            }
+            waypoints = [];
+        }
+
+        // Function to handle CSV upload
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const csvData = e.target.result;
+                    parseCSV(csvData);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Function to parse CSV data
+        function parseCSV(csvData) {
+            Papa.parse(csvData, {
+                complete: function(results) {
+                    waypoints = results.data
+                        .map(row => {
+                            const lat = parseFloat(row[0]);
+                            const lng = parseFloat(row[1]);
+                            const alt = parseFloat(row[2]);
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                return { lat, lng, alt };
+                            }
+                            return null;
+                        })
+                        .filter(wp => wp !== null); // Filter out invalid entries
+
+                    if (waypoints.length > 0) {
+                        // Set initial position of the drone at the first waypoint
+                        droneMarker.setLatLng([waypoints[0].lat, waypoints[0].lng]);
+
+                        // Draw the path with dotted red lines
+                        drawPath();
+
+                        console.log('Waypoints:', waypoints);
+                    } else {
+                        alert('No valid waypoints found in the CSV file.');
+                    }
+                }
+            });
+        }
+
+        // Function to draw a path between waypoints with a dotted red line
+        function drawPath() {
+            const latLngs = waypoints.map(wp => [wp.lat, wp.lng]); // Correct lat/lng order
+            pathPolyline = L.polyline(latLngs, {
+                color: 'red',
+                dashArray: '5, 5',  // Dotted line
+                weight: 2
+            }).addTo(map);
+        }
+
+        // Function to move drone to next waypoint
+        function moveDroneToNextWaypoint() {
+            if (missionIndex < waypoints.length - 1) {
+                const nextWaypoint = waypoints[missionIndex + 1];
+                const currentLocation = droneMarker.getLatLng();
+
+                const latDiff = nextWaypoint.lat - currentLocation.lat; // Correct lat/lng order
+                const lngDiff = nextWaypoint.lng - currentLocation.lng; // Correct lat/lng order
+
+                // Define animation steps for smooth movement
+                missionInterval = setInterval(() => {
+                    const latStep = latDiff / 100;
+                    const lngStep = lngDiff / 100;
+
+                    // Move the drone towards the next waypoint
+                    const newLat = droneMarker.getLatLng().lat + latStep;
+                    const newLng = droneMarker.getLatLng().lng + lngStep;
+
+                    droneMarker.setLatLng([newLat, newLng]);
+
+                    // Update and display the current GPS location
+                    updateGPSLocation(newLat, newLng);
+
+                    // When the drone reaches the waypoint
+                    if (Math.abs(newLat - nextWaypoint.lat) < 0.0001 && Math.abs(newLng - nextWaypoint.lng) < 0.0001) { 
+                        missionIndex++;
+                        clearInterval(missionInterval);
+
+                        // Continue the mission after reaching the waypoint
+                        if (missionIndex < waypoints.length) {
+                            moveDroneToNextWaypoint();
+                        }
+                    }
+                }, 100);  // Update every 100 ms (smooth movement)
+            }
+        }
+
+        // Function to update and display the current GPS location
+        function updateGPSLocation(lat, lng) {
+            const gpsDisplay = document.getElementById('gpsCoordinates');
+            gpsDisplay.innerHTML = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
+
+            // Center the map on the drone's location
+            map.setView([lat, lng], map.getZoom());
+        }
+    </script>
+
+</body>
+</html>
